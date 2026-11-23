@@ -61,7 +61,7 @@ def pip_audit():
 
 def zap():
     try:
-        alertas = json.loads((R / "zap-alertas.json").read_text(encoding="utf-8"))
+        alertas = json.loads((R / "zap-alertas.json").read_text(encoding="utf-8"))["alerts"]
     except (OSError, ValueError):
         return "n/a"
     tipos = {(a["risk"], a["alert"]) for a in alertas}
