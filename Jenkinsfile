@@ -52,7 +52,11 @@ pipeline {
         // >>> [SEGURIDAD]: aquí van las etapas "Security Review (SAST)" y "Dependency Management"
 
         // >>> [ZAP]: aquí van las etapas "Deploy Staging" y "DAST - OWASP ZAP"
-
+        stage('Deploy Staging') {
+            steps {
+                sh 'bash scripts/deploy.sh staging 5001'
+            }
+        }
         stage('Deploy Producción') {
             // >>> [GATE]: aquí va la condición "when" que protege producción
             steps {
