@@ -37,7 +37,30 @@ pipeline {
                 sh '.venv/bin/python -m compileall -q app.py'
             }
         }
+        stage('DAST - OWASP ZAP') {
+            steps {
+                sh '''
+                    set -eu
+                    KEY=$(cat /run/secrets/zap_api_key)
+                    ZAP=http://zap:8080
+                    OBJETIVO=http://jenkins:5001
+                    mkdir -p reports
 
+                    curl -fsS "$ZAP/JSON/core/action/newSession/?name=ev3&overwrite=true&apikey=$KEY" > /dev/null
+
+                    SPIDER=$(curl -fsS "$ZAP/JSON/spider/action/scan/?url=$OBJETIVO&apikey=$KEY" | python3 -c 'import sys,json; print(json.load(sys.stdin)["scan"])')
+                    until [ "$(curl -fsS "$ZAP/JSON/spider/view/status/?scanId=$SPIDER&apikey=$KEY" | python3 -c 'import sys,json; print(json.load(sys.stdin)["status"])')" = "100" ]; do sleep 2; done
+
+                    ASCAN=$(curl -fsS "$ZAP/JSON/ascan/action/scan/?url=$OBJETIVO&recurse=true&apikey=$KEY" | python3 -c 'import sys,json; print(json.load(sys.stdin)["scan"])')
+                    until [ "$(curl -fsS "$ZAP/JSON/ascan/view/status/?scanId=$ASCAN&apikey=$KEY" | python3 -c 'import sys,json; print(json.load(sys.stdin)["status"])')" = "100" ]; do sleep 5; done
+
+                    curl -fsS "$ZAP/OTHER/core/other/htmlreport/?apikey=$KEY" -o reports/zap-report.html
+                    curl -fsS "$ZAP/JSON/core/view/alerts/?baseurl=$OBJETIVO&apikey=$KEY" -o reports/zap-alertas.json
+
+                    python3 -c 'import json,collections; a=json.load(open("reports/zap-alertas.json"))["alerts"]; c=collections.Counter(x["risk"] for x in a); print("ZAP alertas:", len(a), dict(c)); open("reports/zap-resumen.txt","w").write(str(dict(c)))'
+                '''
+            }
+        }
         stage('Test') {
             steps {
                 sh '.venv/bin/python -m pytest --junitxml=reports/junit.xml'
